@@ -1,4 +1,4 @@
-package httpmodules
+package httpmod
 
 import (
 	"testing"
