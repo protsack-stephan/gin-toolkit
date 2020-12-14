@@ -1,24 +1,76 @@
 package httperr
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
 
 // NotFound http not found error
-var NotFound = NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound))
+func NotFound(c *gin.Context, error ...string) {
+	err := NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound))
+
+	if len(error) > 0 {
+		err.Message = error[0]
+	}
+
+	c.JSON(err.Status, err)
+}
 
 // InternalServerError http internal server error
-var InternalServerError = NewError(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+func InternalServerError(c *gin.Context, error ...string) {
+	err := NewError(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+
+	if len(error) > 0 {
+		err.Message = error[0]
+	}
+
+	c.JSON(err.Status, err)
+}
 
 // UnprocessableEntity http unprocessable entity
-var UnprocessableEntity = NewError(http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity))
+func UnprocessableEntity(c *gin.Context, error ...string) {
+	err := NewError(http.StatusUnprocessableEntity, http.StatusText(http.StatusUnprocessableEntity))
+
+	if len(error) > 0 {
+		err.Message = error[0]
+	}
+
+	c.JSON(err.Status, err)
+}
 
 // BadRequest http bad request
-var BadRequest = NewError(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+func BadRequest(c *gin.Context, error ...string) {
+	err := NewError(http.StatusBadRequest, http.StatusText(http.StatusBadRequest))
+
+	if len(error) > 0 {
+		err.Message = error[0]
+	}
+
+	c.JSON(err.Status, err)
+}
 
 // Unauthorized http unauthorized
-var Unauthorized = NewError(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+func Unauthorized(c *gin.Context, error ...string) {
+	err := NewError(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+
+	if len(error) > 0 {
+		err.Message = error[0]
+	}
+
+	c.JSON(err.Status, err)
+}
 
 // Forbidden htt forbidden
-var Forbidden = NewError(http.StatusForbidden, http.StatusText(http.StatusForbidden))
+func Forbidden(c *gin.Context, error ...string) {
+	err := NewError(http.StatusForbidden, http.StatusText(http.StatusForbidden))
+
+	if len(error) > 0 {
+		err.Message = error[0]
+	}
+
+	c.JSON(err.Status, err)
+}
 
 // Error http error struct
 type Error struct {
