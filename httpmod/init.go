@@ -15,9 +15,8 @@ func Init(router *gin.Engine, modules []func() Module) error {
 		return ErrEmptyModules
 	}
 
-	for _, getModule := range modules {
-		module := getModule()
-
+	for _, getter := range modules {
+		module := getter()
 		group := router.Group(module.Path)
 
 		for _, middleware := range module.Middleware {
@@ -25,13 +24,7 @@ func Init(router *gin.Engine, modules []func() Module) error {
 		}
 
 		for _, route := range module.Routes {
-			handlers := []gin.HandlerFunc{}
-
-			for _, middleware := range route.Middleware {
-				handlers = append(handlers, middleware)
-			}
-
-			group.Handle(route.Method, route.Path, append(handlers, route.Handler)...)
+			group.Handle(route.Method, route.Path, append(route.Middleware, route.Handler)...)
 		}
 	}
 
