@@ -8,6 +8,6 @@ import (
 type Route struct {
 	Path       string
 	Method     string
-	Middleware []func() gin.HandlerFunc
+	Middleware []gin.HandlerFunc
 	Handler    func(c *gin.Context)
 }
