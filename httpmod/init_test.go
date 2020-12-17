@@ -16,18 +16,20 @@ const initTestURL = "/hello"
 const initTestStatus = http.StatusOK
 const initTestResponse = "hello world"
 
-var initTestModules = []Module{
-	{
-		Path: initTestModule,
-		Routes: []Route{
-			{
-				Path:   initTestURL,
-				Method: http.MethodGet,
-				Handler: func(c *gin.Context) {
-					c.String(initTestStatus, initTestResponse)
+var initTestModules = []func() Module{
+	func() Module {
+		return Module{
+			Path: initTestModule,
+			Routes: []Route{
+				{
+					Path:   initTestURL,
+					Method: http.MethodGet,
+					Handler: func(c *gin.Context) {
+						c.String(initTestStatus, initTestResponse)
+					},
 				},
 			},
-		},
+		}
 	},
 }
 
