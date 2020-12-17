@@ -17,5 +17,9 @@ func BasicAuth(storage string) gin.HandlerFunc {
 		}
 	}
 
+	if len(users) <= 0 {
+		return func(c *gin.Context) {}
+	}
+
 	return gin.BasicAuth(users)
 }
