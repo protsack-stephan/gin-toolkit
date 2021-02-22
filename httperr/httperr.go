@@ -6,6 +6,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Error http error struct
+type Error struct {
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+}
+
+// NewError create http response error
+func NewError(status int, message string) *Error {
+	return &Error{
+		status,
+		message,
+	}
+}
+
 // NotFound http not found error
 func NotFound(c *gin.Context, error ...string) {
 	err := NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound))
@@ -72,16 +86,13 @@ func Forbidden(c *gin.Context, error ...string) {
 	c.JSON(err.Status, err)
 }
 
-// Error http error struct
-type Error struct {
-	Status  int    `json:"status"`
-	Message string `json:"message"`
-}
+// TooManyRequests http to many requests
+func TooManyRequests(c *gin.Context, error ...string) {
+	err := NewError(http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests))
 
-// NewError create http response error
-func NewError(status int, message string) *Error {
-	return &Error{
-		status,
-		message,
+	if len(error) > 0 {
+		err.Message = error[0]
 	}
+
+	c.JSON(err.Status, err)
 }

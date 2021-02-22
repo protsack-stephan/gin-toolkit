@@ -21,6 +21,7 @@ const httperrUnprocessableEntityURL = "/unprocessable-entity"
 const httperrBadRequestURL = "/bad-request"
 const httperrUnauthorizedURL = "/unauthorized"
 const httperrForbiddenURL = "/forbidden"
+const httperrToManyReqURL = "/to-many-req"
 
 func creatErrorTestServer() http.Handler {
 	gin.SetMode(gin.TestMode)
@@ -48,6 +49,10 @@ func creatErrorTestServer() http.Handler {
 
 	router.Handle(http.MethodGet, httperrForbiddenURL, func(c *gin.Context) {
 		Forbidden(c)
+	})
+
+	router.Handle(http.MethodGet, httperrToManyReqURL, func(c *gin.Context) {
+		TooManyRequests(c)
 	})
 
 	return router
@@ -91,6 +96,10 @@ func TestErrors(t *testing.T) {
 		{
 			httperrForbiddenURL,
 			NewError(http.StatusForbidden, http.StatusText(http.StatusForbidden)),
+		},
+		{
+			httperrToManyReqURL,
+			NewError(http.StatusTooManyRequests, http.StatusText(http.StatusTooManyRequests)),
 		},
 	} {
 		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, test.URL))
