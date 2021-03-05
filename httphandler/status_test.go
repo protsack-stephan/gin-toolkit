@@ -40,7 +40,7 @@ func TestStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Make suer uptime at least 1 second
+	// make sure uptime at least 1 second
 	time.Sleep(time.Second * 1)
 
 	res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, statusTestURL))
