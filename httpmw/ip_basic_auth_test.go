@@ -10,21 +10,21 @@ import (
 	"testing"
 )
 
-func TestCheckIpSuccess(t *testing.T) {
+func TestCheckIPSuccess(t *testing.T) {
 	assert := assert.New(t)
 	ipRange := Range{net.ParseIP("192.168.10.1"), net.ParseIP("192.168.10.10")}
 
 	assert.True(checkIP(ipRange, "192.168.10.2"))
 }
 
-func TestCheckIpFails(t *testing.T) {
+func TestCheckIPFails(t *testing.T) {
 	assert := assert.New(t)
 	ipRange := Range{net.ParseIP("192.168.10.1"), net.ParseIP("192.168.10.10")}
 
 	assert.False(checkIP(ipRange, "192.168.10.22"))
 }
 
-func TestIpSucceed(t *testing.T) {
+func TestIPSucceed(t *testing.T) {
 	assert := assert.New(t)
 	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
 	router := gin.New()
@@ -42,7 +42,7 @@ func TestIpSucceed(t *testing.T) {
 	assert.Equal(http.StatusOK, w.Code)
 }
 
-func TestIp401(t *testing.T) {
+func TestIP401(t *testing.T) {
 	called := false
 	assert := assert.New(t)
 	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
