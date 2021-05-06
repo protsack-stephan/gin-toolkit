@@ -3,20 +3,17 @@ package httpmw
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
 	"strings"
 )
 
-// Range define range with start and end IPs
-type Range struct {
-	Start net.IP
-	End   net.IP
+type ipBand struct {
+	start net.IP
+	end   net.IP
 }
-
-// Ranges array of Range
-type Ranges []Range
 
 type authPair struct {
 	value string
@@ -26,14 +23,14 @@ type authPair struct {
 type authPairs []authPair
 
 func (a authPairs) searchCredential(authValue string) (string, bool) {
-	if authValue == "" {
-		return "", false
-	}
-	for _, pair := range a {
-		if pair.value == authValue {
-			return pair.user, true
+	if authValue != "" {
+		for _, pair := range a {
+			if pair.value == authValue {
+				return pair.user, true
+			}
 		}
 	}
+
 	return "", false
 }
 
@@ -41,14 +38,14 @@ func (a authPairs) searchCredential(authValue string) (string, bool) {
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * basic authentication in format "user:pass,user2:pass2,user3:pass3"
 func IPBasicAuth(ipRange string, authStorage string) gin.HandlerFunc {
-	ipRanges := Ranges{}
+	var ipRanges []ipBand
 
 	for _, ipRange := range strings.Split(ipRange, ",") {
 		if len(ipRange) > 0 {
 			ips := strings.Split(ipRange, "-")
 			ipRanges = append(
 				ipRanges,
-				Range{
+				ipBand{
 					net.ParseIP(ips[0]),
 					net.ParseIP(ips[1]),
 				},
@@ -92,35 +89,29 @@ func IPBasicAuth(ipRange string, authStorage string) gin.HandlerFunc {
 	}
 }
 
-func checkIP(ipRange Range, ip string) bool {
+func checkIP(ipRange ipBand, ip string) bool {
 	input := net.ParseIP(ip)
 
-	return bytes.Compare(input, ipRange.Start) >= 0 && bytes.Compare(input, ipRange.End) <= 0
+	return bytes.Compare(input, ipRange.start) >= 0 && bytes.Compare(input, ipRange.end) <= 0
 }
 
 func processAccounts(accounts gin.Accounts) authPairs {
 	pairs := make(authPairs, 0, len(accounts))
 
-	if len(accounts) <= 0 {
-		return pairs
-	}
-
 	for user, password := range accounts {
-		if user == "" {
-			continue
+		if user != "" {
+			pairs = append(pairs, authPair{
+				value: authorizationHeader(user, password),
+				user:  user,
+			})
 		}
-
-		value := authorizationHeader(user, password)
-		pairs = append(pairs, authPair{
-			value: value,
-			user:  user,
-		})
 	}
+
 	return pairs
 }
 
 func authorizationHeader(user, password string) string {
-	base := user + ":" + password
+	base := fmt.Sprintf("%s:%s", user, password)
 
-	return "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
+	return fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(base)))
 }
