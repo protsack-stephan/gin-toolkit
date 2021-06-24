@@ -1,6 +1,9 @@
 package httpmw
 
 import (
+	"bytes"
+	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,7 +51,21 @@ func (l *limiter) cleanup() {
 }
 
 // Limit middleware to limit number of request per second
-func Limit(limit int) gin.HandlerFunc {
+// if you pass "inRanges" parameter the limit will be applied only to those IP addresses
+// * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
+func Limit(limit int, ipRanges ...string) gin.HandlerFunc {
+	ranges := [][2]net.IP{}
+
+	for _, ips := range ipRanges {
+		for _, ips := range strings.Split(ips, ",") {
+			ip := strings.Split(ips, "-")
+
+			if len(ip) == 2 {
+				ranges = append(ranges, [2]net.IP{net.ParseIP(ip[0]), net.ParseIP(ip[1])})
+			}
+		}
+	}
+
 	limiter := &limiter{
 		&sync.Map{},
 		limit,
@@ -62,7 +79,22 @@ func Limit(limit int) gin.HandlerFunc {
 	}()
 
 	return func(c *gin.Context) {
-		if !limiter.visitor(c.ClientIP()).allow() {
+		ipAddr := c.ClientIP()
+		visitor := limiter.visitor(ipAddr)
+
+		if len(ranges) > 0 {
+			ip := net.ParseIP(ipAddr)
+
+			for _, ips := range ranges {
+				if bytes.Compare(ip, ips[0]) >= 0 && bytes.Compare(ip, ips[1]) <= 0 {
+					if !visitor.allow() {
+						httperr.TooManyRequests(c)
+						c.Abort()
+						return
+					}
+				}
+			}
+		} else if !visitor.allow() {
 			httperr.TooManyRequests(c)
 			c.Abort()
 			return
