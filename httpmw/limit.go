@@ -92,6 +92,7 @@ func Limit(limit int, ipRanges ...string) gin.HandlerFunc {
 						c.Abort()
 						return
 					}
+					break
 				}
 			}
 		} else if !visitor.allow() {
