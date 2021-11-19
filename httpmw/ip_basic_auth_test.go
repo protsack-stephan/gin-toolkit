@@ -4,27 +4,12 @@ import (
 	"encoding/base64"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-func TestCheckIPSuccess(t *testing.T) {
-	assert := assert.New(t)
-	ipRange := ipBand{net.ParseIP("192.168.10.1"), net.ParseIP("192.168.10.10")}
-
-	assert.True(checkIP(ipRange, "192.168.10.2"))
-}
-
-func TestCheckIPFails(t *testing.T) {
-	assert := assert.New(t)
-	ipRange := ipBand{net.ParseIP("192.168.10.1"), net.ParseIP("192.168.10.10")}
-
-	assert.False(checkIP(ipRange, "192.168.10.22"))
-}
-
-func TestIPSucceed(t *testing.T) {
+func TestBasicIPSucceed(t *testing.T) {
 	assert := assert.New(t)
 	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
 	router := gin.New()
@@ -42,7 +27,7 @@ func TestIPSucceed(t *testing.T) {
 	assert.Equal(http.StatusOK, w.Code)
 }
 
-func TestIP401(t *testing.T) {
+func TestBasicIP401(t *testing.T) {
 	called := false
 	assert := assert.New(t)
 	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
@@ -64,7 +49,7 @@ func TestIP401(t *testing.T) {
 	assert.Equal("Basic realm=\"Authorization Required\"", w.Header().Get("WWW-Authenticate"))
 }
 
-func TestIPBasicAuth(t *testing.T) {
+func TestBasicIPAuth(t *testing.T) {
 	assert := assert.New(t)
 	pairs := processAccounts(gin.Accounts{
 		"admin": "password",
@@ -87,7 +72,7 @@ func TestIPBasicAuth(t *testing.T) {
 	})
 }
 
-func TestIPBasicAuthFails(t *testing.T) {
+func TestBasicIPAuthFails(t *testing.T) {
 	assert := assert.New(t)
 
 	assert.Equal(0, len(processAccounts(nil)))
@@ -100,7 +85,7 @@ func TestIPBasicAuthFails(t *testing.T) {
 	assert.Equal(1, len(pairs))
 }
 
-func TestIPBasicAuthSearchCredential(t *testing.T) {
+func TestBasicIPAuthSearchCredential(t *testing.T) {
 	assert := assert.New(t)
 	pairs := processAccounts(gin.Accounts{
 		"admin": "password",
@@ -133,13 +118,13 @@ func TestIPBasicAuthSearchCredential(t *testing.T) {
 	assert.False(found)
 }
 
-func TestIPBasicAuthAuthorizationHeader(t *testing.T) {
+func TestBasicIPAuthAuthorizationHeader(t *testing.T) {
 	assert := assert.New(t)
 
 	assert.Equal("Basic YWRtaW46cGFzc3dvcmQ=", authorizationHeader("admin", "password"))
 }
 
-func TestIPBasicAuthSucceed(t *testing.T) {
+func TestBasicIPAuthSucceed(t *testing.T) {
 	assert := assert.New(t)
 	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
 	creds := "admin:password,user1:pass1"
@@ -159,7 +144,7 @@ func TestIPBasicAuthSucceed(t *testing.T) {
 	assert.Equal("user1", w.Body.String())
 }
 
-func TestIPBasicAuth401(t *testing.T) {
+func TestBasicIPAuth401(t *testing.T) {
 	called := false
 	creds := "user1:pass1"
 	router := gin.New()

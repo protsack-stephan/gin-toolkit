@@ -1,19 +1,12 @@
 package httpmw
 
 import (
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"net"
 	"net/http"
 	"strings"
 )
-
-type ipBand struct {
-	start net.IP
-	end   net.IP
-}
 
 type authPair struct {
 	value string
@@ -38,21 +31,7 @@ func (a authPairs) searchCredential(authValue string) (string, bool) {
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * basic authentication in format "user:pass,user2:pass2,user3:pass3"
 func IPBasicAuth(ipRange string, authStorage string) gin.HandlerFunc {
-	var ipRanges []ipBand
-
-	for _, ipRange := range strings.Split(ipRange, ",") {
-		if len(ipRange) > 0 {
-			ips := strings.Split(ipRange, "-")
-			ipRanges = append(
-				ipRanges,
-				ipBand{
-					net.ParseIP(ips[0]),
-					net.ParseIP(ips[1]),
-				},
-			)
-		}
-	}
-
+	ipRanges := getIpRanges(ipRange)
 	accounts := gin.Accounts{}
 
 	for _, account := range strings.Split(authStorage, ",") {
@@ -87,12 +66,6 @@ func IPBasicAuth(ipRange string, authStorage string) gin.HandlerFunc {
 			c.Set(gin.AuthUserKey, user)
 		}
 	}
-}
-
-func checkIP(ipRange ipBand, ip string) bool {
-	input := net.ParseIP(ip)
-
-	return bytes.Compare(input, ipRange.start) >= 0 && bytes.Compare(input, ipRange.end) <= 0
 }
 
 func processAccounts(accounts gin.Accounts) authPairs {
