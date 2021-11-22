@@ -4,8 +4,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider/cognitoidentityprovideriface"
 	"github.com/gin-gonic/gin"
+	"github.com/protsack-stephan/gin-toolkit/httperr"
 	"log"
-	"net/http"
 	"strings"
 )
 
@@ -24,22 +24,20 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			}
 		}
 
-		realm := "Authorization Required"
-		authHeader := strings.Split(c.GetHeader("Authorization"), "Bearer ")
+		token := strings.Replace(c.GetHeader("Authorization"), "Bearer ", "", 1)
 
-		if len(authHeader) != 2 || authHeader[1] == "" {
-			c.Header("WWW-Authenticate", realm)
-			c.AbortWithStatus(http.StatusUnauthorized)
+		if len(token) <= 0 {
+			httperr.Unauthorized(c)
+			c.Abort()
 			return
 		}
 
-		token := authHeader[1]
 		res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
 
 		if err != nil {
 			log.Println(err)
-			c.Header("WWW-Authenticate", realm)
-			c.AbortWithStatus(http.StatusUnauthorized)
+			httperr.Unauthorized(c)
+			c.Abort()
 			return
 		}
 

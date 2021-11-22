@@ -61,7 +61,6 @@ func TestCognitoIP401(t *testing.T) {
 
 	assert.False(called)
 	assert.Equal(http.StatusUnauthorized, w.Code)
-	assert.Equal("Authorization Required", w.Header().Get("WWW-Authenticate"))
 }
 
 func TestCognitoIpAuth(t *testing.T) {
