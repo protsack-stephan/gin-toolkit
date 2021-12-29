@@ -3,18 +3,23 @@ package httpmw
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
-	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider/cognitoidentityprovideriface"
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
+	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider/cognitoidentityprovideriface"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
-const authTestToken = "token-sg332f"
-const authTestUsername = "alex_name"
+const authTestUsername = "john_doe"
+const authTestClientId = "jN4Ag4CEL2TQtrqk"
+const authTestWrongClientId = "VnFAL5ke9hK8v6bT"
+const authTestIPRanges = "192.168.20.1-192.168.20.10"
+const authTestIPRangesLarge = "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
 
 type cognitoIdentityProviderClientMock struct {
 	cognitoidentityprovideriface.CognitoIdentityProviderAPI
@@ -27,36 +32,50 @@ func (c *cognitoIdentityProviderClientMock) GetUser(input *cognitoidentityprovid
 	return args.Get(0).(*cognitoidentityprovider.GetUserOutput), args.Error(1)
 }
 
+func getJWTtoken() (string, error) {
+	claims := jwt.MapClaims{
+		"client_id": authTestClientId,
+	}
+
+	return jwt.
+		NewWithClaims(jwt.SigningMethodHS256, claims).
+		SignedString([]byte{})
+}
+
 func TestCognitoIPSucceed(t *testing.T) {
 	assert := assert.New(t)
-	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
+
 	router := gin.New()
-	router.Use(IpCognitoAuth(ipRanges, &cognitoIdentityProviderClientMock{}))
+	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/login", nil)
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
 	req.Header.Set("X-Forwarded-For", "192.168.20.2")
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(http.StatusOK, w.Code)
 }
 
 func TestCognitoIP401(t *testing.T) {
-	called := false
 	assert := assert.New(t)
-	ipRanges := "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
+	called := false
+
 	router := gin.New()
-	router.Use(IpCognitoAuth(ipRanges, &cognitoIdentityProviderClientMock{}))
+	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
-
 		c.Status(http.StatusOK)
 	})
 
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/login", nil)
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
 	req.Header.Set("X-Forwarded-For", "192.168.20.20")
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.False(called)
@@ -65,11 +84,11 @@ func TestCognitoIP401(t *testing.T) {
 
 func TestCognitoIpAuth(t *testing.T) {
 	assert := assert.New(t)
-	ipRanges := "192.168.20.1-192.168.20.10"
-	token := authTestToken
-	username := authTestUsername
-	router := gin.New()
 
+	token, err := getJWTtoken()
+	assert.NoError(err)
+
+	username := authTestUsername
 	srv := new(cognitoIdentityProviderClientMock)
 	srv.
 		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
@@ -80,26 +99,64 @@ func TestCognitoIpAuth(t *testing.T) {
 			nil,
 		)
 
-	router.Use(IpCognitoAuth(ipRanges, srv))
+	router := gin.New()
+	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientId))
+	router.GET("/login", func(c *gin.Context) {
+		uname, _ := c.Get("username")
+		assert.Equal(authTestUsername, *uname.(*string))
+		c.Status(http.StatusOK)
+	})
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(http.StatusOK, w.Code)
+}
+
+func TestCognitoIpAuthTokenFails(t *testing.T) {
+	assert := assert.New(t)
+
+	token, err := getJWTtoken()
+	assert.NoError(err)
+
+	username := authTestUsername
+	srv := new(cognitoIdentityProviderClientMock)
+	srv.
+		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
+		Return(
+			&cognitoidentityprovider.GetUserOutput{
+				Username: &username,
+			},
+			nil,
+		)
+
+	router := gin.New()
+	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestWrongClientId))
 	router.GET("/login", func(c *gin.Context) {
 		uname, _ := c.Get("username")
 
 		assert.Equal(authTestUsername, *uname.(*string))
 		c.Status(http.StatusOK)
 	})
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/login", nil)
-	req.Header.Set("Authorization", fmt.Sprintf("%s %s", "Bearer", token))
 	router.ServeHTTP(w, req)
-	assert.Equal(http.StatusOK, w.Code)
+	assert.Equal(http.StatusUnauthorized, w.Code)
 }
 
 func TestCognitoIpAuthFails(t *testing.T) {
 	assert := assert.New(t)
 	called := false
-	ipRanges := "192.168.20.1-192.168.20.10"
-	token := authTestToken
-	router := gin.New()
+
+	token, err := getJWTtoken()
+	assert.NoError(err)
 
 	srv := new(cognitoIdentityProviderClientMock)
 	srv.
@@ -109,14 +166,18 @@ func TestCognitoIpAuthFails(t *testing.T) {
 			errors.New("token is not valid"),
 		)
 
-	router.Use(IpCognitoAuth(ipRanges, srv))
+	router := gin.New()
+	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
 		c.Status(http.StatusOK)
 	})
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/login", nil)
-	req.Header.Set("Authorization", fmt.Sprintf("%s %s", "Bearer", token))
 	router.ServeHTTP(w, req)
 	assert.False(called)
 	assert.Equal(http.StatusUnauthorized, w.Code)
