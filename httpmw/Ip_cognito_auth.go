@@ -14,7 +14,7 @@ import (
 // IpCognitoAuth middleware for:
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * cognito authentication through Authorization Bearer Token
-func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, cogntoClientID string) gin.HandlerFunc {
+func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, clientID string) gin.HandlerFunc {
 	ipRanges := getIpRanges(ipRange)
 
 	return func(c *gin.Context) {
@@ -47,7 +47,7 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 
 		claims, ok := jwtToken.Claims.(jwt.MapClaims)
 
-		if !ok || claims["client_id"] != cogntoClientID {
+		if !ok || claims["client_id"] != clientID {
 			httperr.Unauthorized(c)
 			c.Abort()
 			return
