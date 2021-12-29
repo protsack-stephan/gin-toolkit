@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-const authTestUsername = "alex_name"
-const authTestCogntoClientId = "client-id-123123123"
-const authTestCogntoWrongClientId = "client-id-123123124"
+const authTestUsername = "john_doe"
+const authTestClientId = "jN4Ag4CEL2TQtrqk"
+const authTestWrongClientId = "VnFAL5ke9hK8v6bT"
 const authTestIPRanges = "192.168.20.1-192.168.20.10"
 const authTestIPRangesLarge = "192.168.10.1-192.168.10.10,192.168.20.1-192.168.20.10"
 
@@ -34,42 +34,48 @@ func (c *cognitoIdentityProviderClientMock) GetUser(input *cognitoidentityprovid
 
 func getJWTtoken() (string, error) {
 	claims := jwt.MapClaims{
-		"client_id": authTestCogntoClientId,
+		"client_id": authTestClientId,
 	}
 
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte{})
+	return jwt.
+		NewWithClaims(jwt.SigningMethodHS256, claims).
+		SignedString([]byte{})
 }
 
 func TestCognitoIPSucceed(t *testing.T) {
 	assert := assert.New(t)
+
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestCogntoClientId))
+	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/login", nil)
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
 	assert.NoError(err)
 	req.Header.Set("X-Forwarded-For", "192.168.20.2")
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(http.StatusOK, w.Code)
 }
 
 func TestCognitoIP401(t *testing.T) {
-	called := false
 	assert := assert.New(t)
+	called := false
+
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestCogntoClientId))
+	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
-
 		c.Status(http.StatusOK)
 	})
 
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/login", nil)
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
 	assert.NoError(err)
 	req.Header.Set("X-Forwarded-For", "192.168.20.20")
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assert.False(called)
@@ -78,11 +84,11 @@ func TestCognitoIP401(t *testing.T) {
 
 func TestCognitoIpAuth(t *testing.T) {
 	assert := assert.New(t)
-	username := authTestUsername
-	router := gin.New()
-	token, err := getJWTtoken()
 
+	token, err := getJWTtoken()
 	assert.NoError(err)
+
+	username := authTestUsername
 	srv := new(cognitoIdentityProviderClientMock)
 	srv.
 		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
@@ -93,28 +99,30 @@ func TestCognitoIpAuth(t *testing.T) {
 			nil,
 		)
 
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestCogntoClientId))
+	router := gin.New()
+	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		uname, _ := c.Get("username")
-
 		assert.Equal(authTestUsername, *uname.(*string))
 		c.Status(http.StatusOK)
 	})
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/login", nil)
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
 	assert.NoError(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(http.StatusOK, w.Code)
 }
 
 func TestCognitoIpAuthTokenFails(t *testing.T) {
 	assert := assert.New(t)
-	username := authTestUsername
-	router := gin.New()
-	token, err := getJWTtoken()
 
+	token, err := getJWTtoken()
 	assert.NoError(err)
+
+	username := authTestUsername
 	srv := new(cognitoIdentityProviderClientMock)
 	srv.
 		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
@@ -125,17 +133,20 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 			nil,
 		)
 
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestCogntoWrongClientId))
+	router := gin.New()
+	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestWrongClientId))
 	router.GET("/login", func(c *gin.Context) {
 		uname, _ := c.Get("username")
 
 		assert.Equal(authTestUsername, *uname.(*string))
 		c.Status(http.StatusOK)
 	})
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/login", nil)
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
 	assert.NoError(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.Equal(http.StatusUnauthorized, w.Code)
 }
@@ -143,10 +154,10 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 func TestCognitoIpAuthFails(t *testing.T) {
 	assert := assert.New(t)
 	called := false
-	router := gin.New()
-	token, err := getJWTtoken()
 
+	token, err := getJWTtoken()
 	assert.NoError(err)
+
 	srv := new(cognitoIdentityProviderClientMock)
 	srv.
 		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
@@ -155,15 +166,18 @@ func TestCognitoIpAuthFails(t *testing.T) {
 			errors.New("token is not valid"),
 		)
 
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestCogntoClientId))
+	router := gin.New()
+	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientId))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
 		c.Status(http.StatusOK)
 	})
-	w := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/login", nil)
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
 	assert.NoError(err)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	assert.False(called)
 	assert.Equal(http.StatusUnauthorized, w.Code)
