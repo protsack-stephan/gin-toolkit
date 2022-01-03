@@ -68,6 +68,7 @@ type Key struct {
 	KTY    string `json:"kty"`
 	N      string `json:"n"`
 	Use    string `json:"use"`
+	mut    sync.Mutex
 	rsa256 *rsa.PublicKey
 }
 
@@ -76,6 +77,9 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 	if k.rsa256 != nil {
 		return k.rsa256, nil
 	}
+
+	k.mut.Lock()
+	defer k.mut.Unlock()
 
 	edc, err := base64.RawURLEncoding.DecodeString(k.E)
 
