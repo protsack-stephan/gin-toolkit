@@ -115,6 +115,9 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 // IpCognitoAuth middleware for:
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * cognito authentication through Authorization Bearer Token
+// Note:
+// If the expiration duration is less than one, the items in the cache never expire (by default), and must be deleted manually.
+// If the cleanup interval is less than one, expired items are not deleted from the cache.
 func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, clientID string, expire time.Duration) gin.HandlerFunc {
 	ipRanges := getIpRanges(ipRange)
 	jwk := new(JWK)
