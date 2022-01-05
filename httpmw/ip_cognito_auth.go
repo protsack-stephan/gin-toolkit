@@ -12,11 +12,13 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider/cognitoidentityprovideriface"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/patrickmn/go-cache"
 	"github.com/protsack-stephan/gin-toolkit/httperr"
 )
 
@@ -113,9 +115,13 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 // IpCognitoAuth middleware for:
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * cognito authentication through Authorization Bearer Token
-func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, clientID string) gin.HandlerFunc {
+// Note:
+// If the expiration duration is less than one, the items in the cache never expire (by default), and must be deleted manually.
+// If the cleanup interval is less than one, expired items are not deleted from the cache.
+func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, clientID string, expire time.Duration) gin.HandlerFunc {
 	ipRanges := getIpRanges(ipRange)
 	jwk := new(JWK)
+	ch := cache.New(expire, expire)
 
 	return func(c *gin.Context) {
 		if len(ipRanges) > 0 {
@@ -175,16 +181,23 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
-		res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
+		username, ok := ch.Get(token)
 
-		if err != nil {
-			log.Println(err)
-			httperr.Unauthorized(c)
-			c.Abort()
-			return
+		if !ok {
+			res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
+
+			if err != nil {
+				log.Println(err)
+				httperr.Unauthorized(c)
+				c.Abort()
+				return
+			}
+
+			username = *res.Username
+			ch.SetDefault(token, *res.Username)
 		}
 
-		c.Set("username", res.Username)
+		c.Set("username", username)
 		c.Next()
 	}
 }
