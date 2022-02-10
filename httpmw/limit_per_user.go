@@ -8,7 +8,7 @@ import (
 	"github.com/protsack-stephan/gin-toolkit/httperr"
 )
 
-// LimitPerUser middleware to limit number of request per second for user
+// LimitPerUser middleware is used to limit number of request per second for user.
 func LimitPerUser(cmdable redis.Cmdable, limit int) gin.HandlerFunc {
 	redisLimiter := NewRedisLimiter(cmdable, limit, time.Second*1)
 
