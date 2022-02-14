@@ -24,6 +24,14 @@ func createRedisLimitServer(cmd redis.Cmdable, exp time.Duration, group string, 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
+	limitTestUserGroups := make(map[string]struct{})
+	limitTestUserGroups[limitTestUserGroup] = struct{}{}
+
+	limitTestUser := &CognitoUser{
+		Username: limitTestUserName,
+		Groups:   limitTestUserGroups,
+	}
+
 	router.Use(func(c *gin.Context) {
 		user := new(CognitoUser)
 		user.SetUsername(limitTestUserName)
@@ -72,6 +80,7 @@ func TestLimitPerUser(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, res.StatusCode)
 	})
+	limitGroups := []string{limitTestUserGroup}
 
 	t.Run("test no limit", func(t *testing.T) {
 		mr, err := miniredis.Run()
@@ -91,4 +100,53 @@ func TestLimitPerUser(t *testing.T) {
 			assert.Equal(http.StatusOK, res.StatusCode)
 		}
 	})
+}
+func TestLimitPerUserInGroup(t *testing.T) {
+	assert := assert.New(t)
+
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	limitGroups := []string{limitTestUserGroup}
+
+	srv := httptest.NewServer(createRedisLimitServer(cmdable, limitGroups...))
+	defer srv.Close()
+
+	for i := 0; i < limitTestCount+1; i++ {
+		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
+
+		assert.NoError(err)
+
+		if i < limitTestCount {
+			assert.Equal(http.StatusOK, res.StatusCode)
+		} else {
+			assert.Equal(http.StatusTooManyRequests, res.StatusCode)
+		}
+	}
+}
+func TestLimitPerUserInAnotherGroup(t *testing.T) {
+	assert := assert.New(t)
+
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	limitGroups := []string{limitTestUserAnotherGroup}
+
+	srv := httptest.NewServer(createRedisLimitServer(cmdable, limitGroups...))
+	defer srv.Close()
+
+	for i := 0; i < limitTestCount+1; i++ {
+		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
+
+		assert.NoError(err)
+		assert.Equal(http.StatusOK, res.StatusCode)
+	}
 }
