@@ -9,19 +9,33 @@ import (
 )
 
 // LimitPerUser middleware is used to limit number of request per second for user.
-func LimitPerUser(cmdable redis.Cmdable, limit int) gin.HandlerFunc {
-	redisLimiter := NewRedisLimiter(cmdable, limit, time.Second*1)
+// Note:
+// if expiration is set to 0 it means the key has no expiration time.
+func LimitPerUser(cmdable redis.Cmdable, limit int, expiration time.Duration, groups ...string) gin.HandlerFunc {
+	limiter := NewRedisLimiter(cmdable, limit, expiration)
 
 	return func(c *gin.Context) {
-		username, exists := c.Get("username")
+		var user *CognitoUser
 
-		if !exists {
+		if model, ok := c.Get("user"); ok {
+			switch model := model.(type) {
+			case *CognitoUser:
+				user = model
+			}
+		}
+
+		if user == nil {
 			httperr.Unauthorized(c)
 			c.Abort()
 			return
 		}
 
-		allowed, err := redisLimiter.Allow(c, username.(string), "limit")
+		if len(groups) > 0 && !user.IsInGroup(groups) {
+			c.Next()
+			return
+		}
+
+		allowed, err := limiter.Allow(c, user.Username, "limit")
 
 		if err != nil {
 			httperr.InternalServerError(c)
@@ -35,9 +49,7 @@ func LimitPerUser(cmdable redis.Cmdable, limit int) gin.HandlerFunc {
 			return
 		}
 
-		err = redisLimiter.Seen(c, username.(string), "limit")
-
-		if err != nil {
+		if err := limiter.Seen(c, user.Username, "limit"); err != nil {
 			httperr.InternalServerError(c)
 			c.Abort()
 			return

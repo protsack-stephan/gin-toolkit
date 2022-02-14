@@ -23,6 +23,7 @@ import (
 
 const authTestKID = "pqZ9xSMr5rtwrPG2LRM9v"
 const authTestUsername = "john_doe"
+const authTestUserGroup = "admin"
 const authTestClientID = "jN4Ag4CEL2TQtrqk"
 const authTestWrongClientID = "VnFAL5ke9hK8v6bT"
 const authTestIPRanges = "192.168.20.1-192.168.20.10"
@@ -70,8 +71,9 @@ func createJWKServer() *httptest.Server {
 func getJWTToken(iss string) (string, error) {
 	token := jwt.
 		NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-			"client_id": authTestClientID,
-			"iss":       iss,
+			"client_id":      authTestClientID,
+			"iss":            iss,
+			"cognito:groups": []string{authTestUserGroup},
 		})
 
 	token.Header["kid"] = authTestKID
@@ -146,8 +148,9 @@ func TestCognitoIpAuth(t *testing.T) {
 	router := gin.New()
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
-		uname, _ := c.Get("username")
-		assert.Equal(authTestUsername, uname.(string))
+		user, _ := c.Get("user")
+		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
+		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 
@@ -185,8 +188,9 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 	router := gin.New()
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestWrongClientID, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
-		uname, _ := c.Get("username")
-		assert.Equal(authTestUsername, uname.(string))
+		user, _ := c.Get("user")
+		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
+		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 
@@ -259,8 +263,9 @@ func TestCognitoIpAuthCache(t *testing.T) {
 	router := gin.New()
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Second*10))
 	router.GET("/login", func(c *gin.Context) {
-		uname, _ := c.Get("username")
-		assert.Equal(authTestUsername, uname.(string))
+		user, _ := c.Get("user")
+		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
+		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 
@@ -302,8 +307,9 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 	router := gin.New()
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Millisecond*500))
 	router.GET("/login", func(c *gin.Context) {
-		uname, _ := c.Get("username")
-		assert.Equal(authTestUsername, uname.(string))
+		user, _ := c.Get("user")
+		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
+		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 

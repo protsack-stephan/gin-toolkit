@@ -22,6 +22,34 @@ import (
 	"github.com/protsack-stephan/gin-toolkit/httperr"
 )
 
+// CognitoUser cogntito user entity.
+type CognitoUser struct {
+	Username string
+	Groups   map[string]struct{}
+}
+
+// Set cognito grpoups for user.
+func (cu *CognitoUser) SetGroups(groups []interface{}) {
+	groupsMap := make(map[string]struct{})
+
+	for _, group := range groups {
+		groupsMap[group.(string)] = struct{}{}
+	}
+
+	cu.Groups = groupsMap
+}
+
+// Checks if user groups contains passed groups
+func (cu *CognitoUser) IsInGroup(groups []string) bool {
+	for _, group := range groups {
+		if _, ok := cu.Groups[group]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
 // JWK JSON web keys list.
 type JWK struct {
 	Keys []*Key `json:"keys"`
@@ -140,6 +168,8 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
+		user := new(CognitoUser)
+
 		_, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -171,6 +201,13 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 				return nil, err
 			}
 
+			if groups, ok := claims["cognito:groups"]; ok {
+				switch groups := groups.(type) {
+				case []interface{}:
+					user.SetGroups(groups)
+				}
+			}
+
 			return key.RSA256()
 		})
 
@@ -181,7 +218,14 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
-		username, ok := ch.Get(token)
+		model, ok := ch.Get(token)
+
+		if ok {
+			switch model := model.(type) {
+			case *CognitoUser:
+				user = model
+			}
+		}
 
 		if !ok {
 			res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
@@ -193,11 +237,11 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 				return
 			}
 
-			username = *res.Username
-			ch.SetDefault(token, *res.Username)
+			user.Username = *res.Username
+			ch.SetDefault(token, user)
 		}
 
-		c.Set("username", username)
+		c.Set("user", user)
 		c.Next()
 	}
 }
