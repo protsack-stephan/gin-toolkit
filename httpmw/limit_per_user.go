@@ -1,6 +1,7 @@
 package httpmw
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -9,10 +10,9 @@ import (
 )
 
 // LimitPerUser middleware is used to limit number of request per second for user.
-// Note:
-// if expiration is set to 0 it means the key has no expiration time.
-func LimitPerUser(cmdable redis.Cmdable, limit int, expiration time.Duration, groups ...string) gin.HandlerFunc {
-	limiter := NewRedisLimiter(cmdable, limit, expiration)
+// Note: if expiration is set to 0 it means the key has no expiration time.
+func LimitPerUser(cmdable redis.Cmdable, limit int, key string, expiration time.Duration, groups ...string) gin.HandlerFunc {
+	limiter := NewRedisLimiter(cmdable, fmt.Sprintf("limit:%s", key), limit, expiration)
 
 	return func(c *gin.Context) {
 		var user *CognitoUser
@@ -35,10 +35,10 @@ func LimitPerUser(cmdable redis.Cmdable, limit int, expiration time.Duration, gr
 			return
 		}
 
-		allowed, err := limiter.Allow(c, user.Username, "limit")
+		allowed, err := limiter.Allow(c.Request.Context(), user.Username)
 
 		if err != nil {
-			httperr.InternalServerError(c)
+			httperr.InternalServerError(c, err.Error())
 			c.Abort()
 			return
 		}
@@ -49,8 +49,8 @@ func LimitPerUser(cmdable redis.Cmdable, limit int, expiration time.Duration, gr
 			return
 		}
 
-		if err := limiter.Seen(c, user.Username, "limit"); err != nil {
-			httperr.InternalServerError(c)
+		if err := limiter.Seen(c.Request.Context(), user.Username); err != nil {
+			httperr.InternalServerError(c, err.Error())
 			c.Abort()
 			return
 		}

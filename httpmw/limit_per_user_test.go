@@ -18,27 +18,23 @@ const limitTestUserGroup = "admin"
 const limitTestUserAnotherGroup = "usergroup"
 const limitTestUrl = "/some-url"
 const limitTestLimit = 3
+const limitTestKey = "/v1/test"
 
-func createRedisLimitServer(cmdable redis.Cmdable, groups ...string) http.Handler {
+func createRedisLimitServer(cmd redis.Cmdable, exp time.Duration, group string, groups ...string) http.Handler {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	limitTestUserGroups := make(map[string]struct{})
-	limitTestUserGroups[limitTestUserGroup] = struct{}{}
-
-	limitTestUser := &CognitoUser{
-		Username: limitTestUserName,
-		Groups:   limitTestUserGroups,
-	}
-
 	router.Use(func(c *gin.Context) {
-		c.Set("user", limitTestUser)
+		c.Set("user", &CognitoUser{
+			Username: limitTestUserName,
+			Groups: map[string]struct{}{
+				group: {},
+			},
+		})
 	})
-	if len(groups) > 0 {
-		router.Use(LimitPerUser(cmdable, limitTestLimit, time.Second*1, groups...))
-	} else {
-		router.Use(LimitPerUser(cmdable, limitTestLimit, time.Second*1))
-	}
+
+	router.Use(LimitPerUser(cmd, limitTestLimit, limitTestKey, exp, groups...))
+
 	router.GET(limitTestUrl, func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -48,77 +44,53 @@ func createRedisLimitServer(cmdable redis.Cmdable, groups ...string) http.Handle
 
 func TestLimitPerUser(t *testing.T) {
 	assert := assert.New(t)
+	exp := time.Second * 1
 
-	mr, err := miniredis.Run()
-	assert.NoError(err)
-	defer mr.Close()
-
-	cmdable := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-	limitGroups := []string{limitTestUserGroup}
-
-	srv := httptest.NewServer(createRedisLimitServer(cmdable, limitGroups...))
-	defer srv.Close()
-
-	for i := 0; i < limitTestCount+1; i++ {
-		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
-
+	t.Run("test limit", func(t *testing.T) {
+		mr, err := miniredis.Run()
 		assert.NoError(err)
+		defer mr.Close()
 
-		if i < limitTestCount {
-			assert.Equal(http.StatusOK, res.StatusCode)
-		} else {
-			assert.Equal(http.StatusTooManyRequests, res.StatusCode)
+		cmd := redis.NewClient(&redis.Options{
+			Addr: mr.Addr(),
+		})
+
+		srv := httptest.NewServer(createRedisLimitServer(cmd, exp, limitTestUserGroup, []string{limitTestUserGroup}...))
+		defer srv.Close()
+
+		for i := 0; i < limitTestCount+1; i++ {
+			res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
+			assert.NoError(err)
+
+			if i < limitTestCount {
+				assert.Equal(http.StatusOK, res.StatusCode)
+			} else {
+				assert.Equal(http.StatusTooManyRequests, res.StatusCode)
+			}
 		}
-	}
-}
-func TestLimitPerUserInGroup(t *testing.T) {
-	assert := assert.New(t)
 
-	mr, err := miniredis.Run()
-	assert.NoError(err)
-	defer mr.Close()
-
-	cmdable := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-	limitGroups := []string{limitTestUserGroup}
-
-	srv := httptest.NewServer(createRedisLimitServer(cmdable, limitGroups...))
-	defer srv.Close()
-
-	for i := 0; i < limitTestCount+1; i++ {
+		mr.FastForward(exp)
 		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
-
-		assert.NoError(err)
-
-		if i < limitTestCount {
-			assert.Equal(http.StatusOK, res.StatusCode)
-		} else {
-			assert.Equal(http.StatusTooManyRequests, res.StatusCode)
-		}
-	}
-}
-func TestLimitPerUserInAnotherGroup(t *testing.T) {
-	assert := assert.New(t)
-
-	mr, err := miniredis.Run()
-	assert.NoError(err)
-	defer mr.Close()
-
-	cmdable := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-	limitGroups := []string{limitTestUserAnotherGroup}
-
-	srv := httptest.NewServer(createRedisLimitServer(cmdable, limitGroups...))
-	defer srv.Close()
-
-	for i := 0; i < limitTestCount+1; i++ {
-		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
-
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, res.StatusCode)
-	}
+	})
+
+	t.Run("test no limit", func(t *testing.T) {
+		mr, err := miniredis.Run()
+		assert.NoError(err)
+		defer mr.Close()
+
+		cmd := redis.NewClient(&redis.Options{
+			Addr: mr.Addr(),
+		})
+
+		srv := httptest.NewServer(createRedisLimitServer(cmd, exp, limitTestUserAnotherGroup, []string{limitTestUserGroup}...))
+		defer srv.Close()
+
+		for i := 0; i < limitTestCount+1; i++ {
+			res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
+			assert.NoError(err)
+			assert.Equal(http.StatusOK, res.StatusCode)
+		}
+	})
 }
