@@ -33,6 +33,15 @@ func (cu *CognitoUser) SetGroups(groups []string) {
 	cu.groups = groups
 }
 
+func (cu *CognitoUser) GetGroups() []string {
+	var groups []string
+	for g := range cu.Groups {
+		groups = append(groups, g)
+	}
+
+	return groups
+}
+
 // Checks if user groups contains passed groups
 func (cu *CognitoUser) IsInGroup(groups ...string) bool {
 	for _, group := range groups {
