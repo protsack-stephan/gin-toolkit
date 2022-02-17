@@ -112,6 +112,14 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 	return pub, nil
 }
 
+// CognitoClaims claims object for cognito JWT token.
+type CognitoClaims struct {
+	jwt.StandardClaims
+	ClientID string   `json:"client_id"`
+	ISS      string   `json:"iss"`
+	Groups   []string `json:"cognito:groups"`
+}
+
 // IpCognitoAuth middleware for:
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * cognito authentication through Authorization Bearer Token
@@ -142,7 +150,7 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 
 		user := new(CognitoUser)
 
-		_, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		_, err := jwt.ParseWithClaims(token, new(CognitoClaims), func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
@@ -153,17 +161,17 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 				return nil, errors.New("kid header not found")
 			}
 
-			claims, ok := token.Claims.(jwt.MapClaims)
+			claims, ok := token.Claims.(*CognitoClaims)
 
 			if !ok {
 				return nil, errors.New("couldn't resolve claims")
 			}
 
-			if claims["client_id"] != clientID {
+			if claims.ClientID != clientID {
 				return nil, errors.New("incorrect client id")
 			}
 
-			if err := jwk.Fetch(claims["iss"]); err != nil {
+			if err := jwk.Fetch(claims.ISS); err != nil {
 				return nil, err
 			}
 
@@ -173,12 +181,7 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 				return nil, err
 			}
 
-			if groups, ok := claims["cognito:groups"]; ok {
-				switch groups := groups.(type) {
-				case []interface{}:
-					user.SetGroups(groups)
-				}
-			}
+			user.SetGroups(claims.Groups)
 
 			return key.RSA256()
 		})
@@ -192,11 +195,8 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 
 		model, ok := ch.Get(token)
 
-		if ok {
-			switch model := model.(type) {
-			case *CognitoUser:
-				user = model
-			}
+		if v, ok := model.(*CognitoUser); ok {
+			user = v
 		}
 
 		if !ok {

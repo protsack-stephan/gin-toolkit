@@ -149,8 +149,8 @@ func TestCognitoIpAuth(t *testing.T) {
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
-		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
-		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
+		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
+		assert.Contains(user.(*CognitoUser).GetGroups(), authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 
@@ -189,8 +189,8 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestWrongClientID, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
-		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
-		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
+		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
+		assert.Contains(user.(*CognitoUser).GetGroups(), authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 
@@ -264,8 +264,8 @@ func TestCognitoIpAuthCache(t *testing.T) {
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Second*10))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
-		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
-		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
+		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
+		assert.Contains(user.(*CognitoUser).GetGroups(), authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 
@@ -308,8 +308,8 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Millisecond*500))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
-		assert.Equal(authTestUsername, user.(*CognitoUser).Username)
-		assert.Contains(user.(*CognitoUser).Groups, authTestUserGroup)
+		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
+		assert.Contains(user.(*CognitoUser).GetGroups(), authTestUserGroup)
 		c.Status(http.StatusOK)
 	})
 

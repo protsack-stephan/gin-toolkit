@@ -35,7 +35,7 @@ func LimitPerUser(cmdable redis.Cmdable, limit int, key string, expiration time.
 			return
 		}
 
-		allowed, err := limiter.Allow(c.Request.Context(), user.Username)
+		allowed, err := limiter.Allow(c.Request.Context(), user.GetUsername())
 
 		if err != nil {
 			httperr.InternalServerError(c, err.Error())
@@ -49,7 +49,7 @@ func LimitPerUser(cmdable redis.Cmdable, limit int, key string, expiration time.
 			return
 		}
 
-		if err := limiter.Seen(c.Request.Context(), user.Username); err != nil {
+		if err := limiter.Seen(c.Request.Context(), user.GetUsername()); err != nil {
 			httperr.InternalServerError(c, err.Error())
 			c.Abort()
 			return
