@@ -7,7 +7,6 @@ require (
 	github.com/alicebob/miniredis v2.5.0+incompatible
 	github.com/aws/aws-sdk-go v1.42.9
 	github.com/gin-gonic/gin v1.6.3
-	github.com/go-redis/redis v6.15.9+incompatible // indirect
 	github.com/go-redis/redis/v8 v8.7.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/gomodule/redigo v1.8.8 // indirect
