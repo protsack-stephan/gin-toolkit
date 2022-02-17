@@ -30,15 +30,15 @@ func TestLimiter(t *testing.T) {
 		})
 		lmr := NewRedisLimiter(cmd, limiterTestEntity, 10, exp)
 
-		lmr.Seen(ctx, limiterTestIdentifier)
+		assert.NoError(lmr.Seen(ctx, limiterTestIdentifier))
 		assert.Equal("1", cmd.Get(ctx, key).Val())
 
-		lmr.Seen(ctx, limiterTestIdentifier)
+		assert.NoError(lmr.Seen(ctx, limiterTestIdentifier))
 		assert.Equal("2", cmd.Get(ctx, key).Val())
 
 		mr.FastForward(exp)
 
-		lmr.Seen(ctx, limiterTestIdentifier)
+		assert.NoError(lmr.Seen(ctx, limiterTestIdentifier))
 		assert.Equal("1", cmd.Get(ctx, key).Val())
 	})
 
