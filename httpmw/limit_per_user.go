@@ -30,7 +30,7 @@ func LimitPerUser(cmdable redis.Cmdable, limit int, key string, expiration time.
 			return
 		}
 
-		if len(groups) > 0 && !user.IsInGroup(groups) {
+		if len(groups) > 0 && !user.IsInGroup(groups...) {
 			c.Next()
 			return
 		}

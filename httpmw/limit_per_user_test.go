@@ -25,12 +25,10 @@ func createRedisLimitServer(cmd redis.Cmdable, exp time.Duration, group string, 
 	router := gin.New()
 
 	router.Use(func(c *gin.Context) {
-		c.Set("user", &CognitoUser{
-			username: limitTestUserName,
-			groups: map[string]struct{}{
-				group: {},
-			},
-		})
+		user := new(CognitoUser)
+		user.SetUsername(limitTestUserName)
+		user.SetGroups([]string{group})
+		c.Set("user", user)
 	})
 
 	router.Use(LimitPerUser(cmd, limitTestLimit, limitTestKey, exp, groups...))
