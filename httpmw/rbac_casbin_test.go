@@ -89,7 +89,6 @@ func TestRBACCasbinMiddleware(t *testing.T) {
 
 		e, err := casbin.NewEnforcer(model.Name(), policy.Name())
 		assert.NoError(err)
-		e.EnableLog(true)
 
 		t.Run("test free user policies", func(_ *testing.T) {
 			router := getCasbinRBACTestingRouter(
