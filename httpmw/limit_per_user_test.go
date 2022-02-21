@@ -72,35 +72,6 @@ func TestLimitPerUser(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, res.StatusCode)
 	})
-	limitGroups := []string{limitTestUserGroup}
-
-	t.Run("test no limit", func(t *testing.T) {
-		mr, err := miniredis.Run()
-		assert.NoError(err)
-		defer mr.Close()
-
-		cmd := redis.NewClient(&redis.Options{
-			Addr: mr.Addr(),
-		})
-
-		srv := httptest.NewServer(createRedisLimitServer(cmd, exp, limitTestUserAnotherGroup, []string{limitTestUserGroup}...))
-		defer srv.Close()
-
-		for i := 0; i < limitTestCount+1; i++ {
-			res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
-			assert.NoError(err)
-			assert.Equal(http.StatusOK, res.StatusCode)
-		}
-	})
-}
-func TestLimitPerUserInGroup(t *testing.T) {
-	assert := assert.New(t)
-
-		mr.FastForward(exp)
-		res, err := http.Get(fmt.Sprintf("%s%s", srv.URL, limitTestUrl))
-		assert.NoError(err)
-		assert.Equal(http.StatusOK, res.StatusCode)
-	})
 
 	t.Run("test no limit", func(t *testing.T) {
 		mr, err := miniredis.Run()

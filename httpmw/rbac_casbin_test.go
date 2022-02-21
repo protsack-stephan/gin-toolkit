@@ -39,9 +39,10 @@ g, paid-user, trial-user
 
 var testPaths = []string{"/free", "/trial", "/paid"}
 
-func setupCasbinRBACMWUser(groups ...interface{}) gin.HandlerFunc {
+func setupCasbinRBACMWUser(groups ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user := &CognitoUser{Username: "username"}
+		user := new(CognitoUser)
+		user.SetUsername("username")
 		user.SetGroups(groups)
 
 		c.Set("user", user)
