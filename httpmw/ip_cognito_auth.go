@@ -112,6 +112,14 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 	return pub, nil
 }
 
+// CognitoClaims claims object for cognito JWT token.
+type CognitoClaims struct {
+	jwt.StandardClaims
+	ClientID string   `json:"client_id"`
+	ISS      string   `json:"iss"`
+	Groups   []string `json:"cognito:groups"`
+}
+
 // IpCognitoAuth middleware for:
 // * IP ranges verification in format "192.168.10.1-192.168.10.10,192.168.90.1-192.168.90.10"
 // * cognito authentication through Authorization Bearer Token
@@ -140,7 +148,9 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
-		_, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		user := new(CognitoUser)
+
+		_, err := jwt.ParseWithClaims(token, new(CognitoClaims), func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
@@ -151,17 +161,17 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 				return nil, errors.New("kid header not found")
 			}
 
-			claims, ok := token.Claims.(jwt.MapClaims)
+			claims, ok := token.Claims.(*CognitoClaims)
 
 			if !ok {
 				return nil, errors.New("couldn't resolve claims")
 			}
 
-			if claims["client_id"] != clientID {
+			if claims.ClientID != clientID {
 				return nil, errors.New("incorrect client id")
 			}
 
-			if err := jwk.Fetch(claims["iss"]); err != nil {
+			if err := jwk.Fetch(claims.ISS); err != nil {
 				return nil, err
 			}
 
@@ -170,6 +180,8 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			if err != nil {
 				return nil, err
 			}
+
+			user.SetGroups(claims.Groups)
 
 			return key.RSA256()
 		})
@@ -181,7 +193,11 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
-		username, ok := ch.Get(token)
+		model, ok := ch.Get(token)
+
+		if v, ok := model.(*CognitoUser); ok {
+			user = v
+		}
 
 		if !ok {
 			res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
@@ -193,11 +209,11 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 				return
 			}
 
-			username = *res.Username
-			ch.SetDefault(token, *res.Username)
+			user.SetUsername(*res.Username)
+			ch.SetDefault(token, user)
 		}
 
-		c.Set("username", username)
+		c.Set("user", user)
 		c.Next()
 	}
 }
