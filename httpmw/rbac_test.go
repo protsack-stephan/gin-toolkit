@@ -16,6 +16,7 @@ func TestRBACMiddleware(t *testing.T) {
 
 	t.Run("test RBAC middleware", func(_ *testing.T) {
 		handler := func(c *gin.Context) { c.Status(http.StatusTeapot) }
+
 		t.Run("test access granted", func(_ *testing.T) {
 			router := gin.New()
 			router.Use(RBAC(func(c *gin.Context) (bool, error) {
@@ -61,7 +62,7 @@ func TestRBACMiddleware(t *testing.T) {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			assert.Equal(http.StatusUnauthorized, w.Code)
+			assert.Equal(http.StatusInternalServerError, w.Code)
 		})
 	})
 }

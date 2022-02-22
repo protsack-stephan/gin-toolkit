@@ -93,7 +93,7 @@ func TestRBACCasbinMiddleware(t *testing.T) {
 		t.Run("test free user policies", func(_ *testing.T) {
 			router := getCasbinRBACTestingRouter(
 				setupCasbinRBACMWUser("free-user"),
-				RBAC(CasbinRBACAuthorizeFunc(e)),
+				RBAC(CasbinRBACAuthorizer(e)),
 			)
 
 			// Allow user with free-user group to consume /free endpoint
@@ -121,7 +121,7 @@ func TestRBACCasbinMiddleware(t *testing.T) {
 		t.Run("test trial user policies", func(_ *testing.T) {
 			router := getCasbinRBACTestingRouter(
 				setupCasbinRBACMWUser("trial-user"),
-				RBAC(CasbinRBACAuthorizeFunc(e)),
+				RBAC(CasbinRBACAuthorizer(e)),
 			)
 
 			// Allow user with trial-user group to consume /free endpoint
@@ -149,7 +149,7 @@ func TestRBACCasbinMiddleware(t *testing.T) {
 		t.Run("test paid user policies", func(_ *testing.T) {
 			router := getCasbinRBACTestingRouter(
 				setupCasbinRBACMWUser("paid-user"),
-				RBAC(CasbinRBACAuthorizeFunc(e)),
+				RBAC(CasbinRBACAuthorizer(e)),
 			)
 
 			// Allow user with paid-user group to consume /free endpoint
@@ -177,7 +177,7 @@ func TestRBACCasbinMiddleware(t *testing.T) {
 		t.Run("test user without groups", func(_ *testing.T) {
 			router := getCasbinRBACTestingRouter(
 				setupCasbinRBACMWUser(),
-				RBAC(CasbinRBACAuthorizeFunc(e)),
+				RBAC(CasbinRBACAuthorizer(e)),
 			)
 
 			// Deny user without groups to consume /free endpoint

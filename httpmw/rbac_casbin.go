@@ -7,13 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ErrNoUser indicates there is no user (or the user is nil) in the request's context.
 var ErrNoUser = errors.New("missing user in request context")
 
-// CasbinRBACAuthorizeFunc uses a provided Casbin enforcer to implement RBAC middleware.
+// CasbinRBACAuthorizer uses a provided Casbin enforcer to implement RBAC middleware.
 // This function will look for roles stored in the gin.Context using the `groups` key
 // and will attempt to authorize the request using each found role.
 // If no match is made, the request will be rejected.
-func CasbinRBACAuthorizeFunc(e *casbin.Enforcer) RBACAuthorizeFunc {
+func CasbinRBACAuthorizer(e *casbin.Enforcer) RBACAuthorizeFunc {
 	return func(c *gin.Context) (bool, error) {
 		var user *CognitoUser
 		if val, ok := c.Get("user"); ok && val != nil {
