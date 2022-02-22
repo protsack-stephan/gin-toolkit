@@ -11,8 +11,9 @@ import (
 var ErrNoUser = errors.New("missing user in request context")
 
 // CasbinRBACAuthorizer uses a provided Casbin enforcer to implement RBAC middleware.
-// This function will look for roles stored in the gin.Context using the `groups` key
-// and will attempt to authorize the request using each found role.
+// This function will look up for a `CognitoUser` instance stored in the request's
+// `gin.Context` using the `user` key, and will attempt to authorize the request
+// using each one of the user's roles.
 // If no match is made, the request will be rejected.
 func CasbinRBACAuthorizer(e *casbin.Enforcer) RBACAuthorizeFunc {
 	return func(c *gin.Context) (bool, error) {
