@@ -367,3 +367,42 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 
 	srv.AssertNumberOfCalls(t, "GetUser", 2)
 }
+
+func TestCognitoIpAuthCacheUnreachable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	assert := assert.New(t)
+
+	jwk := createJWKServer()
+	defer jwk.Close()
+
+	token, err := getJWTToken(jwk.URL)
+	assert.NoError(err)
+
+	username := authTestUsername
+	srv := new(cognitoIdentityProviderClientMock)
+	srv.
+		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
+		Return(
+			&cognitoidentityprovider.GetUserOutput{
+				Username: &username,
+			},
+			nil,
+		)
+
+	router := gin.New()
+	cmdable := redis.NewClient(&redis.Options{})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Second*1))
+	router.GET("/login", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(http.StatusInternalServerError, w.Code)
+
+	srv.AssertNumberOfCalls(t, "GetUser", 0)
+}
