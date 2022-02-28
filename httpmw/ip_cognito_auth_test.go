@@ -378,16 +378,10 @@ func TestCognitoIpAuthCacheUnreachable(t *testing.T) {
 	token, err := getJWTToken(jwk.URL)
 	assert.NoError(err)
 
-	username := authTestUsername
 	srv := new(cognitoIdentityProviderClientMock)
 	srv.
 		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
-		Return(
-			&cognitoidentityprovider.GetUserOutput{
-				Username: &username,
-			},
-			nil,
-		)
+		Return(nil, nil)
 
 	router := gin.New()
 	cmdable := redis.NewClient(&redis.Options{})
