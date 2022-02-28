@@ -89,7 +89,7 @@ func TestCognitoIPSucceed(t *testing.T) {
 
 	router := gin.New()
 	cmdable := redis.NewClient(&redis.Options{})
-	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientID, cmdable, time.Minute*1))
+	router.Use(IpCognitoAuth(&cognitoIdentityProviderClientMock{}, cmdable, authTestClientID, authTestIPRangesLarge, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -110,7 +110,7 @@ func TestCognitoIP401(t *testing.T) {
 
 	router := gin.New()
 	cmdable := redis.NewClient(&redis.Options{})
-	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientID, cmdable, time.Minute*1))
+	router.Use(IpCognitoAuth(&cognitoIdentityProviderClientMock{}, cmdable, authTestClientID, authTestIPRangesLarge, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
 		c.Status(http.StatusOK)
@@ -150,8 +150,14 @@ func TestCognitoIpAuth(t *testing.T) {
 		)
 
 	router := gin.New()
-	cmdable := redis.NewClient(&redis.Options{})
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, cmdable, time.Minute*1))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -191,8 +197,14 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 		)
 
 	router := gin.New()
-	cmdable := redis.NewClient(&redis.Options{})
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestWrongClientID, cmdable, time.Minute*1))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestWrongClientID, authTestIPRanges, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -229,8 +241,14 @@ func TestCognitoIpAuthFails(t *testing.T) {
 		)
 
 	router := gin.New()
-	cmdable := redis.NewClient(&redis.Options{})
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, cmdable, time.Minute*1))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
 		c.Status(http.StatusOK)
@@ -275,7 +293,7 @@ func TestCognitoIpAuthCache(t *testing.T) {
 	cmdable := redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, cmdable, time.Second*10))
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Second*10))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -327,7 +345,7 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 	cmdable := redis.NewClient(&redis.Options{
 		Addr: mr.Addr(),
 	})
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, cmdable, expire))
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, expire))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())

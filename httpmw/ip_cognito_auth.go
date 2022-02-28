@@ -126,7 +126,7 @@ type CognitoClaims struct {
 // Note:
 // If the expiration duration is less than one, the items in the cache never expire (by default), and must be deleted manually.
 // If the cleanup interval is less than one, expired items are not deleted from the cache.
-func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, clientID string, cache redis.Cmdable, expire time.Duration) gin.HandlerFunc {
+func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, cache redis.Cmdable, clientID string, ipRange string, expire time.Duration) gin.HandlerFunc {
 	ipRanges := getIpRanges(ipRange)
 	jwk := new(JWK)
 
@@ -192,32 +192,41 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
-		uData, err := cache.Get(c, token).Bytes()
+		data, err := cache.Get(c, token).Bytes()
+
+		if err != nil && err != redis.Nil {
+			httperr.InternalServerError(c, err.Error())
+			c.Abort()
+			return
+		}
+
 		if err == nil {
-			if err := json.Unmarshal(uData, user); err != nil {
-				log.Println(err)
+			if err := json.Unmarshal(data, user); err != nil {
 				httperr.InternalServerError(c, err.Error())
 				c.Abort()
 				return
 			}
-		} else {
+		}
+
+		if err == redis.Nil {
 			res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
+
 			if err != nil {
-				log.Println(err)
-				httperr.Unauthorized(c)
+				httperr.Unauthorized(c, err.Error())
 				c.Abort()
 				return
 			}
 
 			user.SetUsername(*res.Username)
-			uData, err := json.Marshal(user)
+			data, err := json.Marshal(user)
+
 			if err != nil {
-				log.Println(err)
 				httperr.InternalServerError(c, err.Error())
 				c.Abort()
 				return
 			}
-			cache.Set(c, token, uData, expire)
+
+			cache.Set(c, token, data, expire)
 		}
 
 		c.Set("user", user)
