@@ -18,6 +18,7 @@ var ErrNoUser = errors.New("missing user in request context")
 func CasbinRBACAuthorizer(e *casbin.Enforcer) RBACAuthorizeFunc {
 	return func(c *gin.Context) (bool, error) {
 		var user *CognitoUser
+
 		if val, ok := c.Get("user"); ok && val != nil {
 			user, _ = val.(*CognitoUser)
 		}
@@ -28,6 +29,7 @@ func CasbinRBACAuthorizer(e *casbin.Enforcer) RBACAuthorizeFunc {
 
 		for _, role := range user.GetGroups() {
 			res, err := e.Enforce(role, c.Request.URL.Path, c.Request.Method)
+
 			if err != nil {
 				return false, err
 			}
