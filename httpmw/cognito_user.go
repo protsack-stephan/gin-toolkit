@@ -1,6 +1,6 @@
 package httpmw
 
-// CognitoUser cogntito user entity.
+// CognitoUser cognito user entity.
 type CognitoUser struct {
 	Username string
 	Groups   []string
