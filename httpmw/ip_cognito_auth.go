@@ -17,8 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider/cognitoidentityprovideriface"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt"
-	"github.com/patrickmn/go-cache"
 	"github.com/protsack-stephan/gin-toolkit/httperr"
 )
 
@@ -126,10 +126,9 @@ type CognitoClaims struct {
 // Note:
 // If the expiration duration is less than one, the items in the cache never expire (by default), and must be deleted manually.
 // If the cleanup interval is less than one, expired items are not deleted from the cache.
-func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, clientID string, expire time.Duration) gin.HandlerFunc {
+func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, cache redis.Cmdable, clientID string, ipRange string, expire time.Duration) gin.HandlerFunc {
 	ipRanges := getIpRanges(ipRange)
 	jwk := new(JWK)
-	ch := cache.New(expire, expire)
 
 	return func(c *gin.Context) {
 		if len(ipRanges) > 0 {
@@ -193,24 +192,41 @@ func IpCognitoAuth(ipRange string, svc cognitoidentityprovideriface.CognitoIdent
 			return
 		}
 
-		model, ok := ch.Get(token)
+		data, err := cache.Get(c, token).Bytes()
 
-		if v, ok := model.(*CognitoUser); ok {
-			user = v
+		if err != nil && err != redis.Nil {
+			httperr.InternalServerError(c, err.Error())
+			c.Abort()
+			return
 		}
 
-		if !ok {
+		if err == nil {
+			if err := json.Unmarshal(data, user); err != nil {
+				httperr.InternalServerError(c, err.Error())
+				c.Abort()
+				return
+			}
+		}
+
+		if err == redis.Nil {
 			res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
 
 			if err != nil {
-				log.Println(err)
-				httperr.Unauthorized(c)
+				httperr.Unauthorized(c, err.Error())
 				c.Abort()
 				return
 			}
 
 			user.SetUsername(*res.Username)
-			ch.SetDefault(token, user)
+			data, err := json.Marshal(user)
+
+			if err != nil {
+				httperr.InternalServerError(c, err.Error())
+				c.Abort()
+				return
+			}
+
+			cache.Set(c, token, data, expire)
 		}
 
 		c.Set("user", user)

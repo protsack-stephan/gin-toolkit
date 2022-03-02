@@ -13,9 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider/cognitoidentityprovideriface"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -46,7 +48,6 @@ type cognitoIdentityProviderClientMock struct {
 
 func (c *cognitoIdentityProviderClientMock) GetUser(input *cognitoidentityprovider.GetUserInput) (*cognitoidentityprovider.GetUserOutput, error) {
 	args := c.Called(input)
-
 	return args.Get(0).(*cognitoidentityprovider.GetUserOutput), args.Error(1)
 }
 
@@ -87,7 +88,8 @@ func TestCognitoIPSucceed(t *testing.T) {
 	assert := assert.New(t)
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientID, time.Minute*1))
+	cmdable := redis.NewClient(&redis.Options{})
+	router.Use(IpCognitoAuth(&cognitoIdentityProviderClientMock{}, cmdable, authTestClientID, authTestIPRangesLarge, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
@@ -107,7 +109,8 @@ func TestCognitoIP401(t *testing.T) {
 	called := false
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRangesLarge, &cognitoIdentityProviderClientMock{}, authTestClientID, time.Minute*1))
+	cmdable := redis.NewClient(&redis.Options{})
+	router.Use(IpCognitoAuth(&cognitoIdentityProviderClientMock{}, cmdable, authTestClientID, authTestIPRangesLarge, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
 		c.Status(http.StatusOK)
@@ -136,6 +139,7 @@ func TestCognitoIpAuth(t *testing.T) {
 
 	username := authTestUsername
 	srv := new(cognitoIdentityProviderClientMock)
+
 	srv.
 		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
 		Return(
@@ -146,7 +150,14 @@ func TestCognitoIpAuth(t *testing.T) {
 		)
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Minute*1))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -186,7 +197,14 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 		)
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestWrongClientID, time.Minute*1))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestWrongClientID, authTestIPRanges, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -223,7 +241,14 @@ func TestCognitoIpAuthFails(t *testing.T) {
 		)
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Minute*1))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Minute*1))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
 		c.Status(http.StatusOK)
@@ -261,7 +286,14 @@ func TestCognitoIpAuthCache(t *testing.T) {
 		)
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Second*10))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Second*10))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -284,6 +316,7 @@ func TestCognitoIpAuthCache(t *testing.T) {
 }
 
 func TestCognitoIpAuthCacheExpire(t *testing.T) {
+	expire := time.Millisecond
 	gin.SetMode(gin.TestMode)
 	assert := assert.New(t)
 
@@ -305,7 +338,14 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 		)
 
 	router := gin.New()
-	router.Use(IpCognitoAuth(authTestIPRanges, srv, authTestClientID, time.Millisecond*500))
+	mr, err := miniredis.Run()
+	assert.NoError(err)
+	defer mr.Close()
+
+	cmdable := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, expire))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		assert.Equal(authTestUsername, user.(*CognitoUser).GetUsername())
@@ -320,10 +360,43 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	for i := 0; i < 2; i++ {
-		time.Sleep(time.Millisecond * 510)
 		router.ServeHTTP(w, req)
 		assert.Equal(http.StatusOK, w.Code)
+		mr.FastForward(expire)
 	}
 
 	srv.AssertNumberOfCalls(t, "GetUser", 2)
+}
+
+func TestCognitoIpAuthCacheUnreachable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	assert := assert.New(t)
+
+	jwk := createJWKServer()
+	defer jwk.Close()
+
+	token, err := getJWTToken(jwk.URL)
+	assert.NoError(err)
+
+	srv := new(cognitoIdentityProviderClientMock)
+	srv.
+		On("GetUser", &cognitoidentityprovider.GetUserInput{AccessToken: &token}).
+		Return(nil, nil)
+
+	router := gin.New()
+	cmdable := redis.NewClient(&redis.Options{})
+	router.Use(IpCognitoAuth(srv, cmdable, authTestClientID, authTestIPRanges, time.Second*1))
+	router.GET("/login", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req, err := http.NewRequest(http.MethodGet, "/login", nil)
+	assert.NoError(err)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	assert.Equal(http.StatusInternalServerError, w.Code)
+
+	srv.AssertNumberOfCalls(t, "GetUser", 0)
 }
