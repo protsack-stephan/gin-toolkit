@@ -192,7 +192,8 @@ func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, 
 			return
 		}
 
-		data, err := cache.Get(c, token).Bytes()
+		key := fmt.Sprintf("access_token:%s", token)
+		data, err := cache.Get(c, key).Bytes()
 
 		if err != nil && err != redis.Nil {
 			httperr.InternalServerError(c, err.Error())
@@ -226,7 +227,7 @@ func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, 
 				return
 			}
 
-			cache.Set(c, token, data, expire)
+			cache.Set(c, key, data, expire)
 		}
 
 		c.Set("user", user)
