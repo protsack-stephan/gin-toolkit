@@ -16,11 +16,12 @@ func TestLogFormatter(t *testing.T) {
 	assert := assert.New(t)
 
 	t.Run("test log formatting function", func(_ *testing.T) {
+		const apiPath = "/test"
+		const testIP = "0.0.0.0"
+
 		t.Run("test without cognito user middleware", func(_ *testing.T) {
 			e := gin.New()
 			out := new(bytes.Buffer)
-			apiPath := "/test"
-			testIP := "0.0.0.0"
 
 			e.Use(gin.LoggerWithConfig(gin.LoggerConfig{
 				Formatter: LogFormatter,
@@ -40,53 +41,49 @@ func TestLogFormatter(t *testing.T) {
 			assert.Equal(http.StatusTeapot, w.Code)
 
 			entry := new(logEntry)
-			err = json.Unmarshal(out.Bytes(), entry)
-			assert.NoError(err)
+			assert.NoError(json.Unmarshal(out.Bytes(), entry))
 
 			assert.NotEmpty(entry.RequestTime)
 			assert.Equal(testIP, entry.Ip)
 			assert.Equal(apiPath, entry.Path)
 			assert.Equal(w.Code, entry.Status)
 		})
-	})
 
-	t.Run("test with cognito user middleware", func(_ *testing.T) {
-		e := gin.New()
-		out := new(bytes.Buffer)
-		apiPath := "/test"
-		testIP := "0.0.0.0"
+		t.Run("test with cognito user middleware", func(_ *testing.T) {
+			e := gin.New()
+			out := new(bytes.Buffer)
 
-		testUser := &CognitoUser{
-			Username: "test_username",
-			Groups:   []string{"group_1"},
-		}
+			testUser := &CognitoUser{
+				Username: "test_username",
+				Groups:   []string{"group_1"},
+			}
 
-		e.Use(func(c *gin.Context) {
-			c.Set("user", testUser)
+			e.Use(func(c *gin.Context) {
+				c.Set("user", testUser)
+			})
+
+			e.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+				Formatter: LogFormatter,
+				Output:    out,
+			}))
+
+			e.GET(apiPath, func(c *gin.Context) {
+				c.Status(http.StatusTeapot)
+			})
+
+			req, err := http.NewRequest(http.MethodGet, apiPath, nil)
+			assert.NoError(err)
+			req.Header.Add("X-Forwarded-For", testIP)
+
+			w := httptest.NewRecorder()
+			e.ServeHTTP(w, req)
+			assert.Equal(http.StatusTeapot, w.Code)
+
+			entry := new(logEntry)
+			assert.NoError(json.Unmarshal(out.Bytes(), entry))
+
+			assert.Equal(testUser.Username, entry.Username)
+			assert.ElementsMatch(testUser.Groups, entry.UserGroups)
 		})
-
-		e.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-			Formatter: LogFormatter,
-			Output:    out,
-		}))
-
-		e.GET(apiPath, func(c *gin.Context) {
-			c.Status(http.StatusTeapot)
-		})
-
-		req, err := http.NewRequest(http.MethodGet, apiPath, nil)
-		assert.NoError(err)
-		req.Header.Add("X-Forwarded-For", testIP)
-
-		w := httptest.NewRecorder()
-		e.ServeHTTP(w, req)
-		assert.Equal(http.StatusTeapot, w.Code)
-
-		entry := new(logEntry)
-		err = json.Unmarshal(out.Bytes(), entry)
-		assert.NoError(err)
-
-		assert.Equal(testUser.Username, entry.Username)
-		assert.ElementsMatch(testUser.Groups, entry.UserGroups)
 	})
 }
