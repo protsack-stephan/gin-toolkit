@@ -43,8 +43,11 @@ func TestLogFormatter(t *testing.T) {
 			entry := new(logEntry)
 			assert.NoError(json.Unmarshal(out.Bytes(), entry))
 
-			assert.NotEmpty(entry.RequestTime)
-			assert.Equal(testIP, entry.Ip)
+			assert.NotEmpty(entry.ResponseTime)
+			assert.NotEmpty(entry.Latency)
+			assert.NotZero(entry.BodySize)
+			assert.Equal(http.MethodGet, entry.Method)
+			assert.Equal(testIP, entry.IP)
 			assert.Equal(apiPath, entry.Path)
 			assert.Equal(w.Code, entry.Status)
 		})

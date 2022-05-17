@@ -9,35 +9,44 @@ import (
 )
 
 type logEntry struct {
-	RequestTime string   `json:"request_time"`
-	Ip          string   `json:"ip"`
-	Path        string   `json:"path"`
-	Status      int      `json:"status"`
-	Username    string   `json:"username"`
-	UserGroups  []string `json:"user_groups"`
+	ResponseTime string        `json:"response_time"`
+	Status       int           `json:"status"`
+	Latency      time.Duration `json:"latency"`
+	IP           string        `json:"ip"`
+	Method       string        `json:"method"`
+	Path         string        `json:"path"`
+	Username     string        `json:"username,omitempty"`
+	UserGroups   []string      `json:"user_groups,omitempty"`
+	BodySize     int           `json:"body_size"`
 }
 
 // LogFormatter builds a logging entry in JSON format containing these fields:
 // - Unix timestamp of the request time
 // - Client's IP address
 // - Accessed API endpoint/path
+// - Request method (GET, POST, PUT, PATCH, DELETE)
 // - Request's response status code
+// - Latency of the request in milliseconds
+// - Response body size in bytes
 //
 // This function will also look into the gin's context for a user instance.
 // If a CognitoUser instance is found, the formatter will also include the following fields:
 // - Username
 // - User associated group(s)
-func LogFormatter(params gin.LogFormatterParams) string {
-	var user *CognitoUser
-
+func LogFormatter(p gin.LogFormatterParams) string {
 	entry := &logEntry{
-		RequestTime: params.TimeStamp.Format(time.RFC3339),
-		Ip:          params.ClientIP,
-		Path:        params.Path,
-		Status:      params.StatusCode,
+		ResponseTime: p.TimeStamp.Format(time.RFC3339),
+		Status:       p.StatusCode,
+		Latency:      p.Latency,
+		IP:           p.ClientIP,
+		Method:       p.Method,
+		Path:         p.Path,
+		BodySize:     p.BodySize,
 	}
 
-	if val, ok := params.Keys["user"]; ok && val != nil {
+	var user *CognitoUser
+
+	if val, ok := p.Keys["user"]; ok && val != nil {
 		user, _ = val.(*CognitoUser)
 	}
 

@@ -2,9 +2,9 @@ package httpmw
 
 // CognitoUser cognito user entity.
 type CognitoUser struct {
-	Username string
-	Groups   []string
-	Lookup   map[string]struct{}
+	Username string              `json:"username,omitempty"`
+	Groups   []string            `json:"groups,omitempty"`
+	Lookup   map[string]struct{} `json:"-"`
 }
 
 // GetUsername get private username property
