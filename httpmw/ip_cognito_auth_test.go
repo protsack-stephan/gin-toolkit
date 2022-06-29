@@ -98,8 +98,10 @@ func TestCognitoIPSucceed(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRangesLarge,
 		Expire:   time.Minute * 1,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
@@ -130,11 +132,15 @@ func TestCognitoIP401(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRangesLarge,
 		Expire:   time.Minute * 1,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
+		_, exists := c.Get("user")
+		assert.Equal(exists, false)
 		c.Status(http.StatusOK)
 	})
 
@@ -185,8 +191,10 @@ func TestCognitoIpAuth(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRanges,
 		Expire:   time.Minute * 1,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
@@ -240,8 +248,10 @@ func TestCognitoIpAuthTokenFails(t *testing.T) {
 		ClientID: authTestWrongClientID,
 		IpRange:  authTestIPRanges,
 		Expire:   time.Minute * 1,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
@@ -292,8 +302,10 @@ func TestCognitoIpAuthFails(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRanges,
 		Expire:   time.Minute * 1,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		called = true
@@ -345,8 +357,10 @@ func TestCognitoIpAuthCache(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRanges,
 		Expire:   time.Minute * 19,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
@@ -406,8 +420,10 @@ func TestCognitoIpAuthCacheExpire(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRanges,
 		Expire:   expire,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		user, _ := c.Get("user")
@@ -454,8 +470,10 @@ func TestCognitoIpAuthCacheUnreachable(t *testing.T) {
 		ClientID: authTestClientID,
 		IpRange:  authTestIPRanges,
 		Expire:   time.Second * 1,
-		Username: authTestUsername,
-		Groups:   authTestUserGroups,
+		User: &CognitoUser{
+			Username: authTestUsername,
+			Groups:   authTestUserGroups,
+		},
 	}))
 	router.GET("/login", func(c *gin.Context) {
 		c.Status(http.StatusOK)

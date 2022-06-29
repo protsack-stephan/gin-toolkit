@@ -112,14 +112,14 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 	return pub, nil
 }
 
+// IpCognitoParams structure epresents middleware parameters
 type IpCognitoParams struct {
 	Srv      cognitoidentityprovideriface.CognitoIdentityProviderAPI
 	Cache    redis.Cmdable
 	ClientID string
 	IpRange  string
 	Expire   time.Duration
-	Username string
-	Groups   []string
+	User     *CognitoUser
 }
 
 // CognitoClaims claims object for cognito JWT token.
@@ -144,10 +144,7 @@ func IpCognitoAuth(p *IpCognitoParams) gin.HandlerFunc {
 		if len(ipRanges) > 0 {
 			for _, ipRange := range ipRanges {
 				if checkIP(ipRange, c.ClientIP()) {
-					c.Set("user", &CognitoUser{
-						Username: p.Username,
-						Groups:   p.Groups,
-					})
+					c.Set("user", p.User)
 					return
 				}
 			}
