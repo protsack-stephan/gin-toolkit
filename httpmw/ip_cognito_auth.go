@@ -112,6 +112,16 @@ func (k *Key) RSA256() (*rsa.PublicKey, error) {
 	return pub, nil
 }
 
+type IpCognitoParams struct {
+	Srv      cognitoidentityprovideriface.CognitoIdentityProviderAPI
+	Cache    redis.Cmdable
+	ClientID string
+	IpRange  string
+	Expire   time.Duration
+	Username string
+	Groups   []string
+}
+
 // CognitoClaims claims object for cognito JWT token.
 type CognitoClaims struct {
 	jwt.StandardClaims
@@ -126,14 +136,18 @@ type CognitoClaims struct {
 // Note:
 // If the expiration duration is less than one, the items in the cache never expire (by default), and must be deleted manually.
 // If the cleanup interval is less than one, expired items are not deleted from the cache.
-func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, cache redis.Cmdable, clientID string, ipRange string, expire time.Duration) gin.HandlerFunc {
-	ipRanges := getIpRanges(ipRange)
+func IpCognitoAuth(p *IpCognitoParams) gin.HandlerFunc {
+	ipRanges := getIpRanges(p.IpRange)
 	jwk := new(JWK)
 
 	return func(c *gin.Context) {
 		if len(ipRanges) > 0 {
 			for _, ipRange := range ipRanges {
 				if checkIP(ipRange, c.ClientIP()) {
+					c.Set("user", &CognitoUser{
+						Username: p.Username,
+						Groups:   p.Groups,
+					})
 					return
 				}
 			}
@@ -166,7 +180,7 @@ func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, 
 				return nil, errors.New("couldn't resolve claims")
 			}
 
-			if claims.ClientID != clientID {
+			if claims.ClientID != p.ClientID {
 				return nil, errors.New("incorrect client id")
 			}
 
@@ -193,7 +207,7 @@ func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, 
 		}
 
 		key := fmt.Sprintf("access_token:%s", token)
-		data, err := cache.Get(c, key).Bytes()
+		data, err := p.Cache.Get(c, key).Bytes()
 
 		if err != nil && err != redis.Nil {
 			httperr.InternalServerError(c, err.Error())
@@ -210,7 +224,7 @@ func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, 
 		}
 
 		if err == redis.Nil {
-			res, err := svc.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
+			res, err := p.Srv.GetUser(&cognitoidentityprovider.GetUserInput{AccessToken: &token})
 
 			if err != nil {
 				httperr.Unauthorized(c, err.Error())
@@ -227,7 +241,7 @@ func IpCognitoAuth(svc cognitoidentityprovideriface.CognitoIdentityProviderAPI, 
 				return
 			}
 
-			cache.Set(c, key, data, expire)
+			p.Cache.Set(c, key, data, p.Expire)
 		}
 
 		c.Set("user", user)
