@@ -141,7 +141,9 @@ func IpCognitoAuth(p *IpCognitoParams) gin.HandlerFunc {
 	jwk := new(JWK)
 
 	return func(c *gin.Context) {
-		if len(ipRanges) > 0 {
+		token := strings.Replace(c.GetHeader("Authorization"), "Bearer ", "", 1)
+
+		if len(ipRanges) > 0 && len(token) == 0 {
 			for _, ipRange := range ipRanges {
 				if checkIP(ipRange, c.ClientIP()) {
 					c.Set("user", p.User)
@@ -149,8 +151,6 @@ func IpCognitoAuth(p *IpCognitoParams) gin.HandlerFunc {
 				}
 			}
 		}
-
-		token := strings.Replace(c.GetHeader("Authorization"), "Bearer ", "", 1)
 
 		if len(token) <= 0 {
 			httperr.Unauthorized(c)
