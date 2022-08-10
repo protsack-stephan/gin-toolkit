@@ -43,8 +43,13 @@ func createCacheServer(cache redis.Cmdable, statusCode int) http.Handler {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	router.GET(cacheTestURL, Cache(cache, cacheTestExpire, func(c *gin.Context) {
-		c.Data(statusCode, cacheTestContentType, []byte(cacheTestData))
+	router.GET(cacheTestURL, Cache(&CacheParams{
+		Cache:  cache,
+		Expire: cacheTestExpire,
+		Handle: func(c *gin.Context) {
+			c.Data(statusCode, cacheTestContentType, []byte(cacheTestData))
+		},
+		ContentType: "json",
 	}))
 
 	return router
