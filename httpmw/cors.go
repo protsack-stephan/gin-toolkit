@@ -13,6 +13,7 @@ var methods = []string{
 	http.MethodDelete,
 	http.MethodPut,
 	http.MethodOptions,
+	http.MethodHead,
 }
 
 // CORS middleware
