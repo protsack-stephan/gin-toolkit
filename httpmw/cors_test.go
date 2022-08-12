@@ -16,6 +16,7 @@ var corsTestMethods = []string{
 	http.MethodDelete,
 	http.MethodPut,
 	http.MethodOptions,
+	http.MethodHead,
 }
 
 const corsTestURL = "/cors"
