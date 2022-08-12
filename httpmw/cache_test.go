@@ -43,8 +43,13 @@ func createCacheServer(cache redis.Cmdable, statusCode int) http.Handler {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 
-	router.GET(cacheTestURL, Cache(cache, cacheTestExpire, func(c *gin.Context) {
-		c.Data(statusCode, cacheTestContentType, []byte(cacheTestData))
+	router.GET(cacheTestURL, Cache(&CacheParams{
+		Cache:  cache,
+		Expire: cacheTestExpire,
+		Handle: func(c *gin.Context) {
+			c.Data(statusCode, cacheTestContentType, []byte(cacheTestData))
+		},
+		ContentType: cacheTestContentType,
 	}))
 
 	return router
@@ -69,6 +74,7 @@ func TestCache(t *testing.T) {
 		data, err := ioutil.ReadAll(res.Body)
 		assert.NoError(err)
 		assert.Equal(cacheTestData, string(data))
+		assert.Equal(cacheTestContentType, string(res.Header.Get("Content-Type")))
 		assert.Equal(http.StatusOK, res.StatusCode)
 		cmdable.AssertNumberOfCalls(t, "Get", 1)
 		cmdable.AssertNumberOfCalls(t, "Set", 1)
@@ -88,6 +94,7 @@ func TestCache(t *testing.T) {
 
 		assert.NoError(err)
 		assert.Equal(http.StatusOK, res.StatusCode)
+		assert.Equal(cacheTestContentType, string(res.Header.Get("Content-Type")))
 		cmdable.AssertNumberOfCalls(t, "Get", 1)
 		cmdable.AssertNumberOfCalls(t, "Set", 0)
 	})
@@ -106,6 +113,7 @@ func TestCache(t *testing.T) {
 
 		assert.NoError(err)
 		assert.Equal(http.StatusInternalServerError, res.StatusCode)
+		assert.Equal(cacheTestContentType, string(res.Header.Get("Content-Type")))
 		cmdable.AssertNumberOfCalls(t, "Get", 1)
 		cmdable.AssertNumberOfCalls(t, "Set", 0)
 	})

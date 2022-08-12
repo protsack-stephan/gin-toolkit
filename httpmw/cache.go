@@ -25,14 +25,21 @@ func (w *cacheWriter) WriteString(s string) (int, error) {
 	return w.ResponseWriter.WriteString(s)
 }
 
+type CacheParams struct {
+	Cache       redis.Cmdable
+	Expire      time.Duration
+	Handle      gin.HandlerFunc
+	ContentType string
+}
+
 // Cache middleware to cache http responses
-func Cache(cache redis.Cmdable, expire time.Duration, handle gin.HandlerFunc) gin.HandlerFunc {
+func Cache(p *CacheParams) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		url := c.Request.URL.RequestURI()
-		data, err := cache.Get(c, url).Bytes()
+		data, err := p.Cache.Get(c, url).Bytes()
 
 		if err == nil {
-			c.Data(http.StatusOK, http.DetectContentType(data), data)
+			c.Data(http.StatusOK, p.ContentType, data)
 			return
 		}
 
@@ -44,13 +51,13 @@ func Cache(cache redis.Cmdable, expire time.Duration, handle gin.HandlerFunc) gi
 		cw.body = bytes.NewBuffer([]byte{})
 		cw.ResponseWriter = c.Writer
 		c.Writer = cw
-		handle(c)
+		p.Handle(c)
 
 		if cw.Status() != http.StatusOK {
 			return
 		}
 
-		if err := cache.Set(c, url, cw.body.Bytes(), expire).Err(); err != nil {
+		if err := p.Cache.Set(c, url, cw.body.Bytes(), p.Expire).Err(); err != nil {
 			log.Println(err)
 		}
 	}
