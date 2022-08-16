@@ -34,7 +34,17 @@ func (rl *RedisLimiter) getKey(identifier string) string {
 
 // Allow checks identifier is allowed to continue depending on limit
 func (rl *RedisLimiter) Allow(ctx context.Context, identifier string) (bool, error) {
-	count, err := rl.cmdable.Get(ctx, rl.getKey(identifier)).Int()
+	key := rl.getKey(identifier)
+
+	if rl.expire != 0 {
+		ttl := rl.cmdable.PTTL(ctx, key).Val()
+		if ttl.Milliseconds() < 10 {
+			rl.cmdable.Del(ctx, key)
+			return true, nil
+		}
+	}
+
+	count, err := rl.cmdable.Get(ctx, key).Int()
 
 	if err == redis.Nil {
 		return true, nil
